@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="shortcut icon" href="favicon.png" type="image/x-icon" />
+    <title>Milysec</title>
+  </head>
+  <body>
+    <img src="milysec-transparent.png" alt="Milysec" width="100%" />
+    <nav>
+      <ul>
+        <a href="#">www.milysec.com</a>
+      </ul>
+      <ul>
+       <a href="mailto:we@milysec.com"> we@milysec.com</a>
+      </ul>
+      <ul>
+        <a href="tel:+61399571500">(03) 9957 1500</a>
+      </ul>
+    </nav>
+    <div>Please leave an Audio message</div>
+<button id="record">Record</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="play" disabled>Play</button>
+    <button id="save" disabled>Save</button>
+
+    <hr>
+    <div>We’re a rapidly growing team of IT rockstars. We have one mission: helping you make the best IT decisions.
+
+      We’re here to challenge the way IT works. By thinking differently, we support your team with cutting-edge technology to make sure you’re in control at all times.
+      
+      We’re all in. A win for you is a win for us. More than just your IT guys – we’re a nimble extension of your team.
+      
+      Our goal is to see your business learn and grow with us so no matter what stage you’re at, we’ll be there to cheer you on every step of the way.
+      
+      <br>
+       WE WANT TO BE PART OF YOUR STORY</div>
+    <!-- <div id="saved-audio-messages">
+      <h2>Saved messages</h2>
+    </div> -->
+
+    <script>
+      const recordAudio = () =>
+        new Promise(async resolve => {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const mediaRecorder = new MediaRecorder(stream);
+          let audioChunks = [];
+
+          mediaRecorder.addEventListener('dataavailable', event => {
+            audioChunks.push(event.data);
+          });
+
+          const start = () => {
+            audioChunks = [];
+            mediaRecorder.start();
+          };
+
+          const stop = () =>
+            new Promise(resolve => {
+              mediaRecorder.addEventListener('stop', () => {
+                const audioBlob = new Blob(audioChunks);
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                const play = () => audio.play();
+                resolve({ audioChunks, audioBlob, audioUrl, play });
+              });
+
+              mediaRecorder.stop();
+            });
+
+          resolve({ start, stop });
+        });
+
+      const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+
+      const recordButton = document.querySelector('#record');
+      const stopButton = document.querySelector('#stop');
+      const playButton = document.querySelector('#play');
+      const saveButton = document.querySelector('#save');
+      const savedAudioMessagesContainer = document.querySelector('#saved-audio-messages');
+
+      let recorder;
+      let audio;
+
+      recordButton.addEventListener('click', async () => {
+        recordButton.setAttribute('disabled', true);
+        stopButton.removeAttribute('disabled');
+        playButton.setAttribute('disabled', true);
+        saveButton.setAttribute('disabled', true);
+        if (!recorder) {
+          recorder = await recordAudio();
+        }
+        recorder.start();
+      });
+
+      stopButton.addEventListener('click', async () => {
+        recordButton.removeAttribute('disabled');
+        stopButton.setAttribute('disabled', true);
+        playButton.removeAttribute('disabled');
+        saveButton.removeAttribute('disabled');
+        audio = await recorder.stop();
+      });
+
+      playButton.addEventListener('click', () => {
+        audio.play();
+      });
+
+      saveButton.addEventListener('click', () => {
+        const reader = new FileReader();
+        reader.readAsDataURL(audio.audioBlob);
+        reader.onload = () => {
+          const base64AudioMessage = reader.result.split(',')[1];
+
+          fetch('/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: base64AudioMessage })
+          }).then(res => {
+            if (res.status === 201) {
+              return populateAudioMessages();
+            }
+            console.log('Invalid status saving audio message: ' + res.status);
+          });
+        };
+      });
+
+      const populateAudioMessages = () => {
+        return fetch('/messages').then(res => {
+          if (res.status === 200) {
+            return res.json().then(json => {
+              json.messageFilenames.forEach(filename => {
+                let audioElement = document.querySelector(`[data-audio-filename="${filename}"]`);
+                if (!audioElement) {
+                  audioElement = document.createElement('audio');
+                  audioElement.src = `/messages/${filename}`;
+                  audioElement.setAttribute('data-audio-filename', filename);
+                  audioElement.setAttribute('controls', true);
+                  savedAudioMessagesContainer.appendChild(audioElement);
+                }
+              });
+            });
+          }
+          console.log('Invalid status getting messages: ' + res.status);
+        });
+      };
+
+      populateAudioMessages();
+
+
+
+    </script>
+
+    <footer>&copy; Copyright {year}</footer>
+  </body>
+</html>
